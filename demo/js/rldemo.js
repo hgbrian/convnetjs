@@ -1,5 +1,6 @@
   var canvas, ctx;
-    
+  var counter1=0, counter2=0;
+  
     // A 2D vector utility
     var Vec = function(x, y) {
       this.x = x;
@@ -91,10 +92,12 @@
       this.walls = []; 
       var pad = 10;
       util_add_box(this.walls, pad, pad, this.W-pad*2, this.H-pad*2);
+      /*
       util_add_box(this.walls, 100, 100, 200, 300); // inner walls
       this.walls.pop();
       util_add_box(this.walls, 400, 100, 200, 300);
       this.walls.pop();
+      */
       
       // set up food and poison
       this.items = []
@@ -178,6 +181,7 @@
           this.agents[i].forward();
         }
         
+        
         // apply outputs of agents on evironment
         for(var i=0,n=this.agents.length;i<n;i++) {
           var a = this.agents[i];
@@ -234,6 +238,8 @@
               var rescheck = this.stuff_collide_(a.p, it.p, true, false);
               if(!rescheck) { 
                 // ding! nom nom nom
+                if(it.type === 1) counter1 += 1; $(".counter1").html(counter1);
+                if(it.type === 2) counter2 += 1; $(".counter2").html(counter2);
                 if(it.type === 1) a.digestion_signal += 5.0; // mmm delicious apple
                 if(it.type === 2) a.digestion_signal += -6.0; // ewww poison
                 it.cleanup_ = true;
@@ -244,6 +250,7 @@
           }
           
           if(it.age > 5000 && this.clock % 100 === 0 && convnetjs.randf(0,1)<0.1) {
+            console.log("AGED OUT", it);
             it.cleanup_ = true; // replace this one, has been around too long
             update_items = true;
           }
@@ -252,9 +259,15 @@
           var nt = [];
           for(var i=0,n=this.items.length;i<n;i++) {
             var it = this.items[i];
-            if(!it.cleanup_) nt.push(it);
+            // brian edit
+            //if(!it.cleanup_) nt.push(it);
+            if(it.cleanup_) nt.push(i);
           }
-          this.items = nt; // swap
+          // brian edit
+          //this.items = nt; // swap
+          for (var i=nt.length-1; i >= 0; i--) {
+            this.items.splice(nt[i],1);
+          }
         }
         if(this.items.length < 30 && this.clock % 10 === 0 && convnetjs.randf(0,1)<0.25) {
           var newitx = convnetjs.randf(20, this.W-20);
@@ -268,6 +281,7 @@
         for(var i=0,n=this.agents.length;i<n;i++) {
           this.agents[i].backward();
         }
+        
       }
     }
     
@@ -319,6 +333,8 @@
         // in forward pass the agent simply behaves in the environment
         // create input to brain
         var num_eyes = this.eyes.length;
+        
+        /*
         var input_array = new Array(num_eyes * 3);
         for(var i=0;i<num_eyes;i++) {
           var e = this.eyes[i];
@@ -331,6 +347,29 @@
             input_array[i*3 + e.sensed_type] = e.sensed_proximity/e.max_range; // normalize to [0,1]
           }
         }
+        */
+        // TEST!
+        //input_array = rl3d.input_array;
+        //console.log("a", input_array.length, input_array);
+        //console.log("b", rl3d.do_all);
+        //console.log("b", rl3d.get_input_array().length, rl3d.get_input_array());
+        
+        var temp = rl3d.get_input_array();
+        var input_array;
+        //console.log(input_array.length, temp.length);
+        if (temp !== undefined) {
+            input_array = temp;
+            if (input_array.length !== 27) { alert("Error"); }
+            //console.log(input_array);
+        }
+        else {
+            console.log("ERROR");
+            input_array = [];
+            for (var i=0; i < 27; i++) {
+                input_array.push(1);
+            }
+        }
+
         
         // get action from brain
         var actionix = this.brain.forward(input_array);
@@ -537,6 +576,12 @@
       skipdraw = false;
       simspeed = 0;
     }
+    function gopaused() {
+      window.clearInterval(current_interval_id);
+      current_interval_id = setInterval(tick, 20000000);
+      skipdraw = false;
+      simspeed = 0;
+    }
     
     function savenet() {
       var j = w.agents[0].brain.value_net.toJSON();
@@ -561,6 +606,7 @@
     
     function reload() {
       w.agents = [new Agent()]; // this should simply work. I think... ;\
+      rl3d.agent = w.agents[0];
       reward_graph = new cnnvis.Graph(); // reinit
     }
     
@@ -574,5 +620,6 @@
       w = new World();
       w.agents = [new Agent()];
       
+      rl3d.do_all(w.agents[0], w.items, w.walls);
       gofast();
     }
